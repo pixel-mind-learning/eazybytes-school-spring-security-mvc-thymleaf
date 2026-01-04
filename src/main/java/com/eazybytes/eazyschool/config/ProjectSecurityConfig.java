@@ -1,5 +1,6 @@
 package com.eazybytes.eazyschool.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.password.CompromisedPasswordChecker;
@@ -12,20 +13,33 @@ import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.password.HaveIBeenPwnedRestApiPasswordChecker;
 
+@RequiredArgsConstructor
 @Configuration
 public class ProjectSecurityConfig {
+
+    private final AuthenticationSuccessHandler authenticationSuccessHandler;
+    private final AuthenticationFailureHandler authenticationFailureHandler;
 
     @Bean
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
 
-        http.csrf((csrf) -> csrf.disable())
-                .authorizeHttpRequests((requests) -> requests.requestMatchers("/dashboard").permitAll()
-                        .requestMatchers("/", "/home", "/holidays/**", "/contact", "/saveMsg",
-                                "/courses", "/about", "/assets/**").permitAll())
-                .formLogin(Customizer.withDefaults())
-                .httpBasic(Customizer.withDefaults());
+        http.csrf((csrf) -> csrf.disable());
+        http.authorizeHttpRequests((requests) -> requests.requestMatchers("/dashboard").authenticated()
+                .requestMatchers("/", "/home", "/holidays/**", "/contact", "/saveMsg",
+                        "/courses", "/about", "/assets/**", "/login/**").permitAll());
+        http.formLogin(fls -> fls.loginPage("/login")
+                .usernameParameter("userid").passwordParameter("secretPwd")
+                .defaultSuccessUrl("/dashboard").failureUrl("/login?error=true")
+                .successHandler(authenticationSuccessHandler).failureHandler(authenticationFailureHandler)); // prioritize these handlers
+        http.logout(loc -> loc.logoutSuccessUrl("/login?logout=true")
+                .invalidateHttpSession(true)
+                .clearAuthentication(true)
+                .deleteCookies("JSESSIONID"));
+        http.httpBasic(Customizer.withDefaults());
 
         return http.build();
     }
